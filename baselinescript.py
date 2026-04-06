@@ -38,14 +38,8 @@ def timeline(X):
 def Rolling_Medians(X, Y, Z): #X Defines the cohort, Y defines the rig, Z defines the animal (I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_rex1", 1)) is cohort 2, PFC, first animal
     savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\" + X + "\\" + Y + "\\"
     time_line = np.array(pd.read_csv(savepath+"TimeLine.csv", header=None)).astype(np.datetime64).reshape(-1,1)
-    tags = np.array(pd.read_csv(savepath + "AnimalTags.csv", header=None)).ravel().tolist()
-        
-    for tags_ in tags:
-        if Z == "all":
-            known_tags = tags
-            break
-    else:
-        known_tags = [tags[Z]]     
+    known_tags = np.array(pd.read_csv(savepath + "AnimalTags.csv", header=None)).ravel().tolist()[Z]
+    
 
     filtermin=14 #lower limit in g
     filtermax=24 #upper limit in g 
@@ -62,38 +56,32 @@ def Rolling_Medians(X, Y, Z): #X Defines the cohort, Y defines the rig, Z define
             data_coll_weight=pd.concat(frames)
     df=data_coll_weight
     df['Start_Time']=pd.to_datetime(df['Start_Time'])
-    df['Animal']=df['Animal']
     sorted_df = df.sort_values(by=['Start_Time'], ascending=True)
     del df
 
     sorted_df.reset_index(drop=True, inplace=True)
     df=sorted_df.drop([0,1])
-    
+   
     #Extracting relevant days
+    df = df.loc[df['Animal'] == known_tags]
+    print(df)
+
     df = df.loc[df['Start_Time'] <= timeline(6)]
     df = df.loc[df['Start_Time'] >= timeline(1)]
 
     # create a rolling median filter, roll through each animal's data, and plot
     list_x=[]
     list_weights=[]
-    list_weightmeds=[]
-
-    an=-1 #plotting index
-    for rfid in known_tags: #for loop across animals
-        an=an+1
-
+    list_weightmeds=[] 
     #Extracting baseline
-    dfbl = df.loc[df['Start_Time'] <= timeline(2)] 
+    dfbl = df.loc[df['Start_Time'] <= timeline(2)]
 
     #Extracting average weight across the baseline period
     baselineweight = dfbl['Weight'].mean()
 
-    animal_weights =df[df['Animal']==rfid]['Weight'].values
-    animal_times =df[df['Animal']==rfid]['Start_Time'].values
+    animal_weights = df['Weight'].values
+    animal_times = df['Start_Time'].values
 
-    #Should normalise each weight value to baseline
-    animal_weights = (((animal_weights) / (baselineweight)))*100
-        
     list_daily_w=[]
 
     print(animal_times)
@@ -122,34 +110,39 @@ def Rolling_Medians(X, Y, Z): #X Defines the cohort, Y defines the rig, Z define
     x = animal_times[keep_i]
     y = animal_weights[keep_i]
 
+    y = (((y) / (baselineweight)))*100
+
     list_x.append(x)
     list_weightmeds.append(rolling_medians)
     list_weights.append(y)
 
-    an=-1
+    data={
+         "Date":list_x[0],
+         "Weight":list_weights[0]
+        }
 
-    for rfid in known_tags: #for loop across animals
-        an=an+1
-        data={
-            "Date":list_x[an],
-            "Weight":list_weights[an]
-            }
+    filtered_df=pd.DataFrame(data)
+    daily_avg_w=filtered_df.groupby(pd.Grouper(key='Date', freq='12h', origin=str(start_date)[2:12])).median().reset_index()
 
-        filtered_df=pd.DataFrame(data)
-        daily_avg_w=filtered_df.groupby(pd.Grouper(key='Date', freq='12h', origin=str(start_date)[2:12])).median().reset_index()
+    y = daily_avg_w['Weight']
+    x = daily_avg_w['Date']
 
-        y = daily_avg_w['Weight']
-        x = daily_avg_w['Date']
-
-        return x, y
+    return x, y
 
 #Grabbing PFC data for one animal
-PFC1 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 0)
+an1 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 0)
+#an2 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 1)
+#an3 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 2)
+#an4 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 3)
+#an5 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 4)
 
 #Plotting
-fig1, ax1 = plt.subplots(figsize=(10, 8))
-ax1.plot(PFC1[0], PFC1[1], marker='s', linestyle = '-', alpha=0.5, color='black', linewidth=2)
-
+fig1, ax1 = plt.subplots(figsize=(16, 16))
+ax1.plot(an1[0], an1[1], marker='s', linestyle = '-', alpha=0.9, color='lightcoral', linewidth=2)
+#ax1.plot(an2[0], an2[1], marker='s', linestyle = '-', alpha=0.9, color='darkred', linewidth=2)
+#ax1.plot(an3[0], an3[1], marker='s', linestyle = '-', alpha=0.9, color='salmon', linewidth=2)
+#ax1.plot(an4[0], an4[1], marker='s', linestyle = '-', alpha=0.9, color='indianred', linewidth=2)
+#ax1.plot(an5[0], an5[1], marker='s', linestyle = '-', alpha=0.9, color='crimson', linewidth=2)
 
 ax1.axvline(timeline(1), color='black', linestyle='dashed', label = "Baseline")
 ax1.axvline(timeline(2), color='blue', linestyle='dashed', label = "Induction 1")
@@ -158,7 +151,7 @@ ax1.axvline(timeline(4), color='red', linestyle='dashed', label = "Induction 2")
 ax1.axvline(timeline(5), color='red', linestyle='dashed')
 ax1.axvline(timeline(6), color='gray', linestyle='dashed')
 
-ax1.set_title("mPFC DREADDs - Animal 1" )
+ax1.set_title("mPFC DREADDs" )
 ax1.legend()
 ax1.set_ylabel("% Body Weight")
 ax1.set_xlabel("Time")
