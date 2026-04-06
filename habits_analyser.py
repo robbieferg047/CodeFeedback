@@ -30,44 +30,35 @@ def gettimes(X, Y, Z, d): #X = cohort, Y = rig, Z = Animal, d = day
 
     if d == 'day-4bsl':
         start_date = time_line[1] - np.timedelta64(4, 'D')
-        last_date = start_date + np.timedelta64(4, 'D')
 
     if d == 'day-3bsl':
-        start_date = time_line[1] - np.timedelta64(3, 'D')
-        last_date = time_line[1]
+        start_date = time_line[1] - np.timedelta64(3, 'D') 
 
     if d == 'day-2bsl':
-        start_date = time_line[1] - np.timedelta64(2, 'D')
-        last_date = time_line[1]
+        start_date = time_line[1] - np.timedelta64(2, 'D') 
         
     if d == 'day-1bsl':
         start_date = time_line[1] - np.timedelta64(1, 'D')
-        last_date = time_line[1]
 
     if d == 'day1bsl':
         start_date = time_line[1] 
-        last_date = time_line[1] + np.timedelta64(1, 'D')
         
     if d == 'day2bsl':
         start_date = time_line[1] + np.timedelta64(1, 'D')
-        last_date = start_date + np.timedelta64(1, 'D')
 
     if d == 'day1ind':
         start_date = time_line[2]
-        last_date = start_date + np.timedelta64(1, 'D')
 
     if d == 'day2ind':
         start_date = time_line[2] + np.timedelta64(1, 'D')
-        last_date = start_date + np.timedelta64(1, 'D')
 
     if d == 'day3ind':
         start_date = time_line[2] + np.timedelta64(2, 'D')
-        last_date = start_date + np.timedelta64(1, 'D')
-    
+
+
     #Standard stuff
     savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\" + X + "\\" + Y + "\\"
     tags = np.array(pd.read_csv(savepath + "AnimalTags.csv", header=None)).ravel().tolist()
-    time_line = np.array(pd.read_csv(savepath+"TimeLine.csv", header=None)).astype(np.datetime64).reshape(-1,1)
 
     for tags_ in tags:
         if Z == "all":
@@ -76,33 +67,24 @@ def gettimes(X, Y, Z, d): #X = cohort, Y = rig, Z = Animal, d = day
         else:
             known_tags = [tags[Z]]
 
-    day=(last_date-start_date)/np.timedelta64(1,'D')
-    days_to_plot=round(float(day[0]))
 
-    #concatenate data across days to a long pandas dataframe
-    data_coll_weight = pd.read_csv(savepath + str(start_date)[2:12] + "_events.csv")
-    for j in range(days_to_plot):
-            day=start_date+np.timedelta64(j+1,'D') 
-            data = pd.read_csv(savepath + str(day)[2:12] + "_events.csv") 
-            frames=[data_coll_weight,data]
-            data_coll_weight=pd.concat(frames)
-    df=data_coll_weight
+    #concatenate data across days to a pandas dataframe
+    df = pd.read_csv(savepath + str(start_date)[2:12] + "_events.csv")
+
     df['Start_Time']=pd.to_datetime(df['Start_Time'])
-    df['Animal']=df['Animal']
-    
-    sorted_df = df.sort_values(by=['Start_Time'], ascending=True)
-    del df
 
+    sorted_df = df.sort_values(by=['Start_Time'], ascending=True)
     sorted_df.reset_index(drop=True, inplace=True)
     df=sorted_df.drop([0,1])
-
+    
     #Extracting times
     times = df['Start_Time']
 
     #Rounding time values to nearest hour
-    times = pd.Series(times)
+    times = pd.Series(df['Start_Time'])
+    print(times)
     times = times.dt.round('1h')
-    times = times.dt.time #Gives time minusthe date
+    times = times.dt.time
 
     #Counting unique values
     times = pd.Series.value_counts(times)
@@ -131,7 +113,7 @@ def gettimes(X, Y, Z, d): #X = cohort, Y = rig, Z = Animal, d = day
         j = j + 1 
             
         try:
-            if timesarranged[j] != times24h[j]: #J increases each loop, so each line is successively checked for the next hour value
+            if timesarranged[j] != times24h[j]: #j increases each loop, so each line is successively checked for the next hour value
                 zeroes = {
                 "Start_Time":[times24h[j]], 
                 "Counts":[0]}
@@ -149,12 +131,12 @@ def gettimes(X, Y, Z, d): #X = cohort, Y = rig, Z = Animal, d = day
             print(times)                    
             return times
         else:
-            if j == 23:
+            if j == 23: #This is here because the loop might hit 23, and thus be out of range for the arranged times. In that case, this script just forces the concat
                 print(Y, d, 
                       times) #So I can see if the script isn't correcting something it should be
                 times = (times.sort_values(by=['Start_Time'], ascending=True)).reset_index()
                 times['Start_Time'] = times['Start_Time'].astype(str) #Formatting for graphs
-                print(times)                    
+                print(times)
                 return times
             else:
                 continue
@@ -219,13 +201,13 @@ ax1 = fig1.add_subplot(221)
 
 x1, y1 = controltimesdaym1bsl['Start_Time'], controltimesdaym1bsl['Counts']
 x2, y2 = VRFtimesdaym1bsl['Start_Time'], VRFtimesdaym1bsl['Counts']
-x3, y3 = PFCtimesdaym1bsl['Start_Time'], PFCtimesdaym1bsl['Counts']
-x4, y4 = ICtimesdaym1bsl['Start_Time'], ICtimesdaym1bsl['Counts']
+#x3, y3 = PFCtimesdaym1bsl['Start_Time'], PFCtimesdaym1bsl['Counts']
+#x4, y4 = ICtimesdaym1bsl['Start_Time'], ICtimesdaym1bsl['Counts']
 
 ax1.plot(x1, y1, marker='o', linestyle = '-', color=(controlcol), label = 'Control')
 ax1.plot(x2, y2, marker='o', linestyle = '-', color=(VRFcol), label = 'VRF')
-ax1.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
-ax1.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
+#ax1.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
+#ax1.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
 ax1.legend()
 ax1.axvline('12:00:00', color='black', linestyle='dashed', label = 'midday')
 ax1.axes.get_xaxis().set_visible(False)
@@ -236,13 +218,13 @@ ax2 = fig1.add_subplot(222)
 
 x1, y1 = controltimesdaym2bsl['Start_Time'], controltimesdaym2bsl['Counts']
 x2, y2 = VRFtimesdaym2bsl['Start_Time'], VRFtimesdaym2bsl['Counts']
-x3, y3 = PFCtimesdaym2bsl['Start_Time'], PFCtimesdaym2bsl['Counts']
-x4, y4 = ICtimesdaym2bsl['Start_Time'], ICtimesdaym2bsl['Counts']
+#x3, y3 = PFCtimesdaym2bsl['Start_Time'], PFCtimesdaym2bsl['Counts']
+#x4, y4 = ICtimesdaym2bsl['Start_Time'], ICtimesdaym2bsl['Counts']
 
 ax2.plot(x1, y1, marker='o', linestyle = '-', color=(controlcol), label = 'Control')
 ax2.plot(x2, y2, marker='o', linestyle = '-', color=(VRFcol), label = 'VRF')
-ax2.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
-ax2.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
+#ax2.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
+#ax2.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
 ax2.legend()
 ax2.axvline('12:00:00', color='black', linestyle='dashed', label = 'midday')
 ax2.axes.get_xaxis().set_visible(False)
@@ -253,13 +235,13 @@ ax3 = fig1.add_subplot(223)
 
 x1, y1 = controltimesdaym3bsl['Start_Time'], controltimesdaym3bsl['Counts']
 x2, y2 = VRFtimesdaym3bsl['Start_Time'], VRFtimesdaym3bsl['Counts']
-x3, y3 = PFCtimesdaym3bsl['Start_Time'], PFCtimesdaym3bsl['Counts']
-x4, y4 = ICtimesdaym3bsl['Start_Time'], ICtimesdaym3bsl['Counts']
+#x3, y3 = PFCtimesdaym3bsl['Start_Time'], PFCtimesdaym3bsl['Counts']
+#x4, y4 = ICtimesdaym3bsl['Start_Time'], ICtimesdaym3bsl['Counts']
 
 ax3.plot(x1, y1, marker='o', linestyle = '-', color=(controlcol), label = 'Control')
 ax3.plot(x2, y2, marker='o', linestyle = '-', color=(VRFcol), label = 'VRF')
-ax3.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
-ax3.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
+#ax3.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
+#ax3.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
 ax3.legend()
 ax3.axvline('12:00:00', color='black', linestyle='dashed', label = 'midday')
 plt.title("Day -3 baseline")
@@ -271,13 +253,13 @@ ax4 = fig1.add_subplot(224)
 
 x1, y1 = controltimesdaym4bsl['Start_Time'], controltimesdaym4bsl['Counts']
 x2, y2 = VRFtimesdaym4bsl['Start_Time'], VRFtimesdaym4bsl['Counts']
-x3, y3 = PFCtimesdaym4bsl['Start_Time'], PFCtimesdaym4bsl['Counts']
-x4, y4 = ICtimesdaym4bsl['Start_Time'], ICtimesdaym4bsl['Counts']
+#x3, y3 = PFCtimesdaym4bsl['Start_Time'], PFCtimesdaym4bsl['Counts']
+#x4, y4 = ICtimesdaym4bsl['Start_Time'], ICtimesdaym4bsl['Counts']
 
 ax4.plot(x1, y1, marker='o', linestyle = '-', color=(controlcol), label = 'Control')
 ax4.plot(x2, y2, marker='o', linestyle = '-', color=(VRFcol), label = 'VRF')
-ax4.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
-ax4.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
+#ax4.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
+#ax4.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
 ax4.legend()
 ax4.axvline('12:00:00', color='black', linestyle='dashed', label = 'midday')
 plt.title("Day -4 baseline")
@@ -294,13 +276,13 @@ ax1 = fig2.add_subplot(221)
 
 x1, y1 = controltimesday1bsl['Start_Time'], controltimesday1bsl['Counts']
 x2, y2 = VRFtimesday1bsl['Start_Time'], VRFtimesday1bsl['Counts']
-x3, y3 = PFCtimesday1bsl['Start_Time'], PFCtimesday1bsl['Counts']
-x4, y4 = ICtimesday1bsl['Start_Time'], ICtimesday1bsl['Counts']
+#x3, y3 = PFCtimesday1bsl['Start_Time'], PFCtimesday1bsl['Counts']
+#x4, y4 = ICtimesday1bsl['Start_Time'], ICtimesday1bsl['Counts']
 
 ax1.plot(x1, y1, marker='o', linestyle = '-', color=(controlcol), label = 'Control')
 ax1.plot(x2, y2, marker='o', linestyle = '-', color=(VRFcol), label = 'VRF')
-ax1.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
-ax1.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
+#ax1.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
+#ax1.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
 ax1.legend()
 ax1.axvline('12:00:00', color='black', linestyle='dashed', label = 'midday')
 ax1.axes.get_xaxis().set_visible(False)
@@ -311,13 +293,13 @@ ax2 = fig2.add_subplot(222)
 
 x1, y1 = controltimesday2bsl['Start_Time'], controltimesday2bsl['Counts']
 x2, y2 = VRFtimesday2bsl['Start_Time'], VRFtimesday2bsl['Counts']
-x3, y3 = PFCtimesday2bsl['Start_Time'], PFCtimesday2bsl['Counts']
-x4, y4 = ICtimesday2bsl['Start_Time'], ICtimesday2bsl['Counts']
+#x3, y3 = PFCtimesday2bsl['Start_Time'], PFCtimesday2bsl['Counts']
+#x4, y4 = ICtimesday2bsl['Start_Time'], ICtimesday2bsl['Counts']
 
 ax2.plot(x1, y1, marker='o', linestyle = '-', color=(controlcol), label = 'Control')
 ax2.plot(x2, y2, marker='o', linestyle = '-', color=(VRFcol), label = 'VRF')
-ax2.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
-ax2.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
+#ax2.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
+#ax2.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
 ax2.legend()
 ax2.axvline('12:00:00', color='black', linestyle='dashed', label = 'midday')
 ax2.axes.get_xaxis().set_visible(False)
@@ -328,13 +310,13 @@ ax3 = fig2.add_subplot(223)
 
 x1, y1 = controltimesday1ind['Start_Time'], controltimesday1ind['Counts']
 x2, y2 = VRFtimesday1ind['Start_Time'], VRFtimesday1ind['Counts']
-x3, y3 = PFCtimesday1ind['Start_Time'], PFCtimesday1ind['Counts']
-x4, y4 = ICtimesday1ind['Start_Time'], ICtimesday1ind['Counts']
+#x3, y3 = PFCtimesday1ind['Start_Time'], PFCtimesday1ind['Counts']
+#x4, y4 = ICtimesday1ind['Start_Time'], ICtimesday1ind['Counts']
 
 ax3.plot(x1, y1, marker='o', linestyle = '-', color=(controlcol), label = 'Control')
 ax3.plot(x2, y2, marker='o', linestyle = '-', color=(VRFcol), label = 'VRF')
-ax3.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
-ax3.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
+#ax3.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
+#ax3.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
 ax3.legend()
 ax3.axvline('12:00:00', color='black', linestyle='dashed', label = 'midday')
 plt.title("Day 1 Induction")
@@ -346,13 +328,13 @@ ax4 = fig2.add_subplot(224)
 
 x1, y1 = controltimesday2ind['Start_Time'], controltimesday2ind['Counts']
 x2, y2 = VRFtimesday2ind['Start_Time'], VRFtimesday2ind['Counts']
-x3, y3 = PFCtimesday2ind['Start_Time'], PFCtimesday2ind['Counts']
-x4, y4 = ICtimesday2ind['Start_Time'], ICtimesday2ind['Counts']
+#x3, y3 = PFCtimesday2ind['Start_Time'], PFCtimesday2ind['Counts']
+#x4, y4 = ICtimesday2ind['Start_Time'], ICtimesday2ind['Counts']
 
 ax4.plot(x1, y1, marker='o', linestyle = '-', color=(controlcol), label = 'Control')
 ax4.plot(x2, y2, marker='o', linestyle = '-', color=(VRFcol), label = 'VRF')
-ax4.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
-ax4.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
+#ax4.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
+#ax4.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
 ax4.legend()
 ax4.axvline('12:00:00', color='black', linestyle='dashed', label = 'midday')
 plt.title("Day 2 Induction")
@@ -368,13 +350,13 @@ ax1 = fig2.add_subplot(221)
 
 x1, y1 = controltimesday3ind['Start_Time'], controltimesday3ind['Counts']
 x2, y2 = VRFtimesday3ind['Start_Time'], VRFtimesday3ind['Counts']
-x3, y3 = PFCtimesday3ind['Start_Time'], PFCtimesday3ind['Counts']
-x4, y4 = ICtimesday3ind['Start_Time'], ICtimesday3ind['Counts']
+#x3, y3 = PFCtimesday3ind['Start_Time'], PFCtimesday3ind['Counts']
+#x4, y4 = ICtimesday3ind['Start_Time'], ICtimesday3ind['Counts']
 
 ax1.plot(x1, y1, marker='o', linestyle = '-', color=(controlcol), label = 'Control')
 ax1.plot(x2, y2, marker='o', linestyle = '-', color=(VRFcol), label = 'VRF')
-ax1.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
-ax1.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
+#ax1.plot(x3, y3, marker='o', linestyle = '-', color=(PFCcol), label = 'PFC')
+#ax1.plot(x4, y4, marker='o', linestyle = '-', color=(ICcol), label = 'IC')
 ax1.legend()
 ax1.axvline('12:00:00', color='black', linestyle='dashed', label = 'midday')
 plt.title("Day 3 Induction")
