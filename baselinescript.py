@@ -7,25 +7,23 @@ import matplotlib.dates as mdates
 import statistics
 import json
 
+#cohort2
 #"fem7_c_VRF_rex4"
 #"fem4_e_PFChm4di_rex1"
 #"fem6_e_IChm4di_rex3"
 #"fem5_c_rex2"
 
-#cohort2
 #cohort3
+#fem8_c_VRF_rex1
+#fem9_c_rex2
+#fem10_e_PFChm4di_rex3
+#fem11_e_IChm4di_rex4
 
 savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\cohort2\\fem4_e_PFChm4di_rex1\\"
 win=30 #size of rolling median window
 bins=58
 time_line = np.array(pd.read_csv(savepath+"TimeLine.csv", header=None)).astype(np.datetime64).reshape(-1,1)
 start_date=time_line[0]
-
-marker_times=time_line#add important dates here to add vertical lines on last plot
-#last_date=np.datetime64(datetime.today()) #OR TYPE DESIRED DATE ON NEXT LINE AND UNCOMMENT IT
-
-last_date=np.datetime64(date(2026,3,2))
-datetag=str(pd.to_datetime(last_date).to_pydatetime().date())
 
 #For loop to format dates so arrays can be sliced (doesn't work otherwise)
 def timeline(X):
@@ -34,13 +32,22 @@ def timeline(X):
             break
     return(date)
 
+
+marker_times=time_line#add important dates here to add vertical lines on last plot
+#last_date=np.datetime64(datetime.today()) #OR TYPE DESIRED DATE ON NEXT LINE AND UNCOMMENT IT
+
+#last_date=np.datetime64(date(2026,2,25))
+last_date = timeline(5)
+datetag=str(pd.to_datetime(last_date).to_pydatetime().date())
+
 #Class for getting rolling_medians:
 def Rolling_Medians(X, Y, Z): #X Defines the cohort, Y defines the rig, Z defines the animal (I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_rex1", 1)) is cohort 2, PFC, first animal
+    savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\cohort2\\fem4_e_PFChm4di_rex1\\"
+    time_line = np.array(pd.read_csv(savepath+"TimeLine.csv", header=None)).astype(np.datetime64).reshape(-1,1)    
+
     savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\" + X + "\\" + Y + "\\"
-    time_line = np.array(pd.read_csv(savepath+"TimeLine.csv", header=None)).astype(np.datetime64).reshape(-1,1)
     known_tags = np.array(pd.read_csv(savepath + "AnimalTags.csv", header=None)).ravel().tolist()[Z]
     
-
     filtermin=14 #lower limit in g
     filtermax=24 #upper limit in g 
     d=(last_date-start_date)/np.timedelta64(1,'D')
@@ -66,7 +73,7 @@ def Rolling_Medians(X, Y, Z): #X Defines the cohort, Y defines the rig, Z define
     df = df.loc[df['Animal'] == known_tags]
     print(df)
 
-    df = df.loc[df['Start_Time'] <= timeline(6)]
+    df = df.loc[df['Start_Time'] < timeline(6)]
     df = df.loc[df['Start_Time'] >= timeline(1)]
 
     # create a rolling median filter, roll through each animal's data, and plot
@@ -129,12 +136,19 @@ def Rolling_Medians(X, Y, Z): #X Defines the cohort, Y defines the rig, Z define
 
     return x, y
 
+#"fem7_c_VRF_rex4"
+#"fem4_e_PFChm4di_rex1"
+#"fem6_e_IChm4di_rex3"
+#"fem5_c_rex2"
+
+#cohort2
+#cohort3
+
 #Grabbing PFC data for one animal
 an1 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 0)
-#an2 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 1)
-#an3 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 2)
-#an4 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 3)
-#an5 = Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1", 4)
+#an2 = Rolling_Medians("cohort3", "fem10_e_PFChm4di_rex3", 1)
+#an3 = Rolling_Medians("cohort3", "fem10_e_PFChm4di_rex3", 2)
+#an4 = Rolling_Medians("cohort3", "fem10_e_PFChm4di_rex3", 3)
 
 #Plotting
 fig1, ax1 = plt.subplots(figsize=(16, 16))
@@ -142,16 +156,14 @@ ax1.plot(an1[0], an1[1], marker='s', linestyle = '-', alpha=0.9, color='lightcor
 #ax1.plot(an2[0], an2[1], marker='s', linestyle = '-', alpha=0.9, color='darkred', linewidth=2)
 #ax1.plot(an3[0], an3[1], marker='s', linestyle = '-', alpha=0.9, color='salmon', linewidth=2)
 #ax1.plot(an4[0], an4[1], marker='s', linestyle = '-', alpha=0.9, color='indianred', linewidth=2)
-#ax1.plot(an5[0], an5[1], marker='s', linestyle = '-', alpha=0.9, color='crimson', linewidth=2)
 
 ax1.axvline(timeline(1), color='black', linestyle='dashed', label = "Baseline")
 ax1.axvline(timeline(2), color='blue', linestyle='dashed', label = "Induction 1")
 ax1.axvline(timeline(3), color='blue', linestyle='dashed')
 ax1.axvline(timeline(4), color='red', linestyle='dashed', label = "Induction 2")
 ax1.axvline(timeline(5), color='red', linestyle='dashed')
-ax1.axvline(timeline(6), color='gray', linestyle='dashed')
 
-ax1.set_title("mPFC DREADDs" )
+ax1.set_title("PFC Cohort 1 Animal 1")
 ax1.legend()
 ax1.set_ylabel("% Body Weight")
 ax1.set_xlabel("Time")
