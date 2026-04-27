@@ -185,7 +185,7 @@ data_final = pd.concat([Rolling_Medians("cohort2", "fem6_e_IChm4di_rex3"), Rolli
                     Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1"), Rolling_Medians("cohort3", "fem10_e_PFChm4di_rex3")])
 
 #Linear mixed effects model (Considering our study design)
-md = smf.mixedlm("Weight ~ Treatment + Date", data_final, groups=data_final["Cage"]) #Models weight with predictor variables as treatment and date. We need to model cage as a random effect to account for potential pseudoreplication
+md = smf.mixedlm("Weight ~ Treatment + Date", data_final, groups=data_final["Animal"]) #Models weight with predictor variables as treatment and date. We need to model animal as a random effect to account for potential pseudoreplication
 mdf = md.fit()
 residuals = mdf.resid
 fitted = mdf.fittedvalues
