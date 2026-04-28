@@ -8,6 +8,11 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
 fig, ax = plt.subplots()
+X = ["cohort2, cohort3"]
+Y = ["fem7_c_VRF_rex4", "fem4_e_PFChm4di_rex1", "fem6_e_IChm4di_rex3", "fem5_c_rex2", 
+     "fem8_c_VRF_rex1", "fem9_c_rex2", "fem10_e_PFChm4di_rex3", "fem11_e_IChm4di_rex4"]
+
+#Here, we can list off our cohorts and rigs, the script will run the command for all
 
 def Rolling_Medians(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_rex1", 1)) is cohort 2, PFC
     win = 30
@@ -91,7 +96,7 @@ def Rolling_Medians(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolli
             }   
         filtered_df=pd.DataFrame(data)
         df = filtered_df.groupby(pd.Grouper(key='Date', freq = f'{bin_size}' + "h", origin=str(time_line[1])[2:12])).median().reset_index()
-        baselineweight = (df.loc[df['Date'] < (timeline(1) + np.timedelta64(2, "D"))])['Weight'].mean() #Pulls average baseline weight (I.e., all weight values made during baseline period)
+        baselineweight = (df.loc[df['Date'] < (timeline(1) + np.timedelta64(2, "D"))])['Weight'].mean() #Pulls baseline weight (I.e., all weight values made during baseline period)
         df['Weight'] = (df['Weight']/baselineweight)*100 #Normalising each value
 
         #Getting a column with treatment in it, and unique colours for each treatment (probably a more Pythonic way to do this):
@@ -115,15 +120,17 @@ def Rolling_Medians(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolli
         df['Date'] = days['Days'] #Formatting days column
         df['Treatment'] = T #Formatting treatment column
         df['Cohort'] = X #Nice to retain this information
-        df['Cage'] = Y[-1:] #This is important as we need to model cage as a random effect in stats test (later) to account for potential pseudoreplication
-        #ax.plot(df['Date'], df['Weight'], marker='o', linestyle = '-', color=col, alpha = 0.15) #(Un)comment to iterate over and plot individual animals (Does make graph a bit confusing)
+        df['Cage'] = int((Y[-1:]))
+        df['Cage'] = pd.Series.to_frame(df['Cage']) #This is important as we need to model cage as a random effect in stats test (later) to account for potential pseudoreplication
+        #ax.plot(df['Date'], df['Weight'], marker='o', linestyle = '-', color=col, alpha = 0.15) #(Un)comment to plot individual animals (Makes graph confusing)
         allanimals.append(df) #Appending lists of animal data into a new object
     allanimals = pd.concat(allanimals) #Concatenate into on df
     allanimals = pd.DataFrame(allanimals)
+    print(allanimals)
     return allanimals #df can be returned for further analysis
 
-def add_dailyavg(X): #Input PFCcohort2 and PFCcohort3 for example to return daily averages across cohorts
-    data = X
+def add_dailyavg(data): #Input PFCcohort2 and PFCcohort3 for example to return daily averages across cohorts
+    data = data
     avglist = []
     datelist = []
     errorlist = []
@@ -132,7 +139,7 @@ def add_dailyavg(X): #Input PFCcohort2 and PFCcohort3 for example to return dail
     for days in np.unique(data['Date']): #For loop across days (I.e., the loop will run for all unique day values)
         avgday = data.loc[data['Date'] == Date] #I.e., day 0, day 0.5...
         avgweight = avgday['Weight'].mean() #Returns the average associated with that day
-        error = sp.sem(avgday['Weight']) #Finding the standard error mean associated with the weight values that day for error bars
+        error = sp.sem(avgday['Weight']) #Finding the standard error mean associated with the weigth values that day for error bars
 
         datelist.append(Date) #Appending these values to lists
         avglist.append(avgweight)
@@ -143,7 +150,10 @@ def add_dailyavg(X): #Input PFCcohort2 and PFCcohort3 for example to return dail
     daily_avg['Date'] = datelist
     daily_avg['Daily_SEM'] = errorlist
 
+    print(daily_avg)
+
     return daily_avg
+
 
 #Now run the class for all of our treatments *ACROSS COHORTS!*
 IC = add_dailyavg(pd.concat([Rolling_Medians("cohort2", "fem6_e_IChm4di_rex3"), 
@@ -158,6 +168,9 @@ Control = add_dailyavg(pd.concat([Rolling_Medians("cohort2", "fem5_c_rex2"),
 PFC = add_dailyavg(pd.concat([Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1"), 
                             Rolling_Medians("cohort3", "fem10_e_PFChm4di_rex3")]))
 
+print(PFC)
+
+
 #Plotting the figure
 ax.plot(IC['Date'], IC['Weight'], marker='o', linestyle = '-', color=('royalblue'), label = 'IC, n=10')
 ax.plot(VRF['Date'], VRF['Weight'], marker='o', linestyle = '-', color=('red'), label = 'VRF, n=10')
@@ -167,7 +180,7 @@ ax.axvline(2, color='black', linestyle='dashed', label = "Induction") #These axv
 ax.axvline(5, color='black', linestyle='dashed')
 ax.axvline(8, color='black', linestyle='dashed')
 ax.axvline(11, color='black', linestyle='dashed')
-ax.errorbar(IC['Date'], IC['Weight'], yerr=IC['Daily_SEM'], xerr = None, color = 'royalblue', ls = None) #Plotting SEMs
+ax.errorbar(IC['Date'], IC['Weight'], yerr=IC['Daily_SEM'], xerr = None, color = 'royalblue', ls = None)
 ax.errorbar(VRF['Date'], VRF['Weight'], yerr=VRF['Daily_SEM'], xerr = None, color = 'red', ls = None)
 ax.errorbar(Control['Date'], Control['Weight'], yerr=Control['Daily_SEM'], xerr = None, color = 'black', ls = None)
 ax.errorbar(PFC['Date'], PFC['Weight'], yerr=PFC['Daily_SEM'], xerr = None, color = 'dodgerblue', ls = None)
@@ -178,18 +191,20 @@ plt.xlabel("Time (Days)")
 plt.grid(True)  
 plt.show()
 
-#Concatenating the data into one object for statistical test
+#Concatenating the data into one variable for statistical test
 data_final = pd.concat([Rolling_Medians("cohort2", "fem6_e_IChm4di_rex3"), Rolling_Medians("cohort3", "fem11_e_IChm4di_rex4"),
                     Rolling_Medians("cohort2", "fem5_c_rex2"), Rolling_Medians("cohort3", "fem9_c_rex2"),
                     Rolling_Medians("cohort3", "fem8_c_VRF_rex1"), Rolling_Medians("cohort2", "fem7_c_VRF_rex4"),
                     Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1"), Rolling_Medians("cohort3", "fem10_e_PFChm4di_rex3")])
 
 #Linear mixed effects model (Considering our study design)
-md = smf.mixedlm("Weight ~ Treatment + Date", data_final, groups=data_final["Animal"]) #Models weight with predictor variables as treatment and date. We need to model animal as a random effect to account for potential pseudoreplication
-mdf = md.fit()
-residuals = mdf.resid
-fitted = mdf.fittedvalues
-summary = mdf.summary()
+model = smf.mixedlm("Weight ~ Treatment", data_final, groups=data_final["Animal"], re_formula = '0 + Cage') #Models weight with predictor variables as treatment and date. We need to model animal as a random effect to account for potential pseudoreplication
+#(For above) We need to model animal AND cage as random effects to account for 
+#pseudoreplication. We might consider also modelling cohort
+model = model.fit()
+residuals = model.resid
+fitted = model.fittedvalues
+summary = model.summary()
 
 #Testing assumptions:
 #Q-Q plot for normality of residuals
