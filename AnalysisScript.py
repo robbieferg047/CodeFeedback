@@ -7,13 +7,6 @@ import scipy.stats as sp
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
-fig, ax = plt.subplots()
-X = ["cohort2, cohort3"]
-Y = ["fem7_c_VRF_rex4", "fem4_e_PFChm4di_rex1", "fem6_e_IChm4di_rex3", "fem5_c_rex2", 
-     "fem8_c_VRF_rex1", "fem9_c_rex2", "fem10_e_PFChm4di_rex3", "fem11_e_IChm4di_rex4"]
-
-#Here, we can list off our cohorts and rigs, the script will run the command for all
-
 def Rolling_Medians(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_rex1", 1)) is cohort 2, PFC
     win = 30
     savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\" + X + "\\" + Y + "\\" #standard stuff
@@ -200,7 +193,7 @@ data_final = pd.concat([Rolling_Medians("cohort2", "fem6_e_IChm4di_rex3"), Rolli
 #Linear mixed effects model (Considering our study design)
 model = smf.mixedlm("Weight ~ Treatment", data_final, groups=data_final["Animal"], re_formula = '0 + Cage') #Models weight with predictor variables as treatment and date. We need to model animal as a random effect to account for potential pseudoreplication
 #(For above) We need to model animal AND cage as random effects to account for 
-#pseudoreplication. We might consider also modelling cohort
+#pseudoreplication. We might consider also modelling cohort too to account for cohort specific effects
 model = model.fit()
 residuals = model.resid
 fitted = model.fittedvalues
