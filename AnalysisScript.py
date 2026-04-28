@@ -7,14 +7,15 @@ import scipy.stats as sp
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
-fig, ax = plt.subplots()
+fig, (ax1, ax2) = plt.subplots(1, 2)
+fig.set_size_inches(16, 8)
+
 X = ["cohort2, cohort3"]
 Y = ["fem7_c_VRF_rex4", "fem4_e_PFChm4di_rex1", "fem6_e_IChm4di_rex3", "fem5_c_rex2", 
      "fem8_c_VRF_rex1", "fem9_c_rex2", "fem10_e_PFChm4di_rex3", "fem11_e_IChm4di_rex4"]
 
 #Here, we can list off our cohorts and rigs, the script will run the command for all
-
-def Rolling_Medians(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_rex1", 1)) is cohort 2, PFC
+def GetData(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_rex1", 1)) is cohort 2, PFC
     win = 30
     savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\" + X + "\\" + Y + "\\" #standard stuff
     known_tags = np.array(pd.read_csv(savepath + "AnimalTags.csv", header=None)).ravel().tolist() 
@@ -81,10 +82,33 @@ def Rolling_Medians(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolli
         x = animal_times[keep_i]
         y = animal_weights[keep_i]
         list_x.append(x)
-        list_weightmeds.append(rolling_medians)
         list_weights.append(y)
 
-    list_daily_w=[]
+    an=-1
+    df1=df[df['Pellets'] != 0]
+    list_m = []
+    list_t = []
+    for rfid in known_tags: #for loop across animals
+        an=an+1
+        p=df1[df1['Animal']==rfid]['Pellets'].values
+        t=df1[df1['Animal']==rfid]['Start_Time'].values
+        intervals=np.diff(t)/1000000000
+        y, x = np.histogram(intervals, bins=np.arange(0,120,2))
+        
+        meal_threshold=30 #define duration (s) of meal based on histograms 
+        rows=len(p)-1
+        for i in range(rows):
+            row=rows-i
+            interval=intervals[row-1]
+            if u[row]==u[row-1]: #same unit
+                if interval<meal_threshold:
+                    p[row-1]=p[row-1]+p[row]
+                    p=np.delete(p, row)
+                    t=np.delete(t, row)
+                    u=np.elete(u, row)
+        list_m.append(p)
+        list_t.append(t)
+                   
     allanimals = []
     an=-1
     for rfid in known_tags: #for loop across animals
@@ -92,12 +116,20 @@ def Rolling_Medians(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolli
         data={
             "Date":list_x[an],
             "Weight":list_weights[an],
-            "Animal":int(known_tags[an]) #Adding animal tag
+            "Animal":int(known_tags[an]),
+            }
+        data_m = {
+            "MealSize":list_m[an],
+            "MealDates":list_t[an]
             }   
         filtered_df=pd.DataFrame(data)
+        filtered_df_m=pd.DataFrame(data_m)
         df = filtered_df.groupby(pd.Grouper(key='Date', freq = f'{bin_size}' + "h", origin=str(time_line[1])[2:12])).median().reset_index()
+        df_m = filtered_df_m.groupby(pd.Grouper(key='MealDates', freq = f'{bin_size}' + "h", origin=str(time_line[1])[2:12])).median().reset_index()
         baselineweight = (df.loc[df['Date'] < (timeline(1) + np.timedelta64(2, "D"))])['Weight'].mean() #Pulls baseline weight (I.e., all weight values made during baseline period)
+        print(df_m)
         df['Weight'] = (df['Weight']/baselineweight)*100 #Normalising each value
+        df['MealSize'] = df_m['MealSize']
 
         #Getting a column with treatment in it, and unique colours for each treatment (probably a more Pythonic way to do this):
         if "PFC" in Y: 
@@ -121,76 +153,104 @@ def Rolling_Medians(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolli
         df['Treatment'] = T #Formatting treatment column
         df['Cohort'] = X #Nice to retain this information
         df['Cage'] = int((Y[-1:])) #This is important as we need to model cage as a random effect in stats test (later) to account for potential pseudoreplication
-        #ax.plot(df['Date'], df['Weight'], marker='o', linestyle = '-', color=col, alpha = 0.15) #(Un)comment to plot individual animals (Makes graph confusing)
+        #ax1.plot(df['Date'], df['Weight'], marker='o', linestyle = '-', color=col, alpha = 0.15)
+        #ax2.plot(df['Date'], df['MealSize'], marker='o', linestyle = '-', color=col, alpha = 0.15) #(Un)comment to plot individual animals (Makes graph confusing)
+
         allanimals.append(df) #Appending lists of animal data into a new object
     allanimals = pd.concat(allanimals) #Concatenate into on df
     allanimals = pd.DataFrame(allanimals)
     print(allanimals)
+    
     return allanimals #df can be returned for further analysis
 
 def add_dailyavg(data): #Input PFCcohort2 and PFCcohort3 for example to return daily averages across cohorts
-    data = data
     avglist = []
+    avgmeallist = []
     datelist = []
-    errorlist = []
+    errorlistw = []
+    errorlistm = []
+
     Date = 0
 
     for days in np.unique(data['Date']): #For loop across days (I.e., the loop will run for all unique day values)
         avgday = data.loc[data['Date'] == Date] #I.e., day 0, day 0.5...
         avgweight = avgday['Weight'].mean() #Returns the average associated with that day
-        error = sp.sem(avgday['Weight']) #Finding the standard error mean associated with the weigth values that day for error bars
+        avgmeal = avgday['MealSize'].mean()
+        errorw = sp.sem(avgday['Weight']) #Finding the standard error mean associated with the weight values that day for error bars
+        errorm = sp.sem(avgday['MealSize'])
 
         datelist.append(Date) #Appending these values to lists
         avglist.append(avgweight)
-        errorlist.append(error)
+        avgmeallist.append(avgmeal)
+        errorlistm.append(errorm)
+        errorlistw.append(errorw)
         Date = Date + 0.5 #Run the loop again for the next 12 hour bin
-    daily_avg = pd.DataFrame() #Once all days gone through, make a dataframe consisting of all of these lists
+    daily_avg = pd.DataFrame()
+    daily_avg['Date'] = datelist #Once all days gone through, make a dataframe consisting of all of these lists
     daily_avg['Weight'] = avglist
-    daily_avg['Date'] = datelist
-    daily_avg['Daily_SEM'] = errorlist
+    daily_avg['MealSize'] = avgmeallist
+    daily_avg['Daily_SEM_W'] = errorlistw
+    daily_avg['Daily_SEM_M'] = errorlistm
 
     return daily_avg
 
+
 #Now run the class for all of our treatments *ACROSS COHORTS!*
-IC = add_dailyavg(pd.concat([Rolling_Medians("cohort2", "fem6_e_IChm4di_rex3"), 
-                            Rolling_Medians("cohort3", "fem11_e_IChm4di_rex4")]))
+IC = add_dailyavg(pd.concat([GetData("cohort2", "fem6_e_IChm4di_rex3"), 
+                            GetData("cohort3", "fem11_e_IChm4di_rex4")]))
 
-VRF = add_dailyavg(pd.concat([Rolling_Medians("cohort3", "fem8_c_VRF_rex1"), 
-                            Rolling_Medians("cohort2", "fem7_c_VRF_rex4")]))
+VRF = add_dailyavg(pd.concat([GetData("cohort3", "fem8_c_VRF_rex1"), 
+                            GetData("cohort2", "fem7_c_VRF_rex4")]))
 
-Control = add_dailyavg(pd.concat([Rolling_Medians("cohort2", "fem5_c_rex2"), 
-                            Rolling_Medians("cohort3", "fem9_c_rex2")]))
+Control = add_dailyavg(pd.concat([GetData("cohort2", "fem5_c_rex2"), 
+                            GetData("cohort3", "fem9_c_rex2")]))
 
-PFC = add_dailyavg(pd.concat([Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1"), 
-                            Rolling_Medians("cohort3", "fem10_e_PFChm4di_rex3")]))
+PFC = add_dailyavg(pd.concat([GetData("cohort2", "fem4_e_PFChm4di_rex1"), 
+                            GetData("cohort3", "fem10_e_PFChm4di_rex3")]))
 
-#Plotting the figure
-ax.plot(IC['Date'], IC['Weight'], marker='o', linestyle = '-', color=('royalblue'), label = 'IC, n=10')
-ax.plot(VRF['Date'], VRF['Weight'], marker='o', linestyle = '-', color=('red'), label = 'VRF, n=10')
-ax.plot(Control['Date'], Control['Weight'], marker='o', linestyle = '-', color=('black'), label = 'Control, n=9')
-ax.plot(PFC['Date'], PFC['Weight'], marker='o', linestyle = '-', color=('dodgerblue'), label = 'PFC, n=9')
-ax.axvline(2, color='black', linestyle='dashed', label = "Induction") #These axv line commands plot axv lines at days where induction occurs
-ax.axvline(5, color='black', linestyle='dashed')
-ax.axvline(8, color='black', linestyle='dashed')
-ax.axvline(11, color='black', linestyle='dashed')
-ax.errorbar(IC['Date'], IC['Weight'], yerr=IC['Daily_SEM'], xerr = None, color = 'royalblue', ls = None)
-ax.errorbar(VRF['Date'], VRF['Weight'], yerr=VRF['Daily_SEM'], xerr = None, color = 'red', ls = None)
-ax.errorbar(Control['Date'], Control['Weight'], yerr=Control['Daily_SEM'], xerr = None, color = 'black', ls = None)
-ax.errorbar(PFC['Date'], PFC['Weight'], yerr=PFC['Daily_SEM'], xerr = None, color = 'dodgerblue', ls = None)
-plt.title("Average Body Weight")
-plt.ylabel("% Body Weight")
+#Plotting the figures
+ax1.plot(IC['Date'], IC['Weight'], marker='o', linestyle = '-', color=('royalblue'), label = 'IC, n=10')
+ax1.plot(VRF['Date'], VRF['Weight'], marker='o', linestyle = '-', color=('red'), label = 'VRF, n=10')
+ax1.plot(Control['Date'], Control['Weight'], marker='o', linestyle = '-', color=('black'), label = 'Control, n=9')
+ax1.plot(PFC['Date'], PFC['Weight'], marker='o', linestyle = '-', color=('dodgerblue'), label = 'PFC, n=9')
+ax1.axvline(2, color='black', linestyle='dashed', label = "Induction") #These axv line commands plot axv lines at days where induction occurs
+ax1.axvline(5, color='black', linestyle='dashed')
+ax1.axvline(8, color='black', linestyle='dashed')
+ax1.axvline(11, color='black', linestyle='dashed')
+ax1.errorbar(IC['Date'], IC['Weight'], yerr=IC['Daily_SEM_W'], xerr = None, color = 'royalblue', ls = None)
+ax1.errorbar(VRF['Date'], VRF['Weight'], yerr=VRF['Daily_SEM_W'], xerr = None, color = 'red', ls = None)
+ax1.errorbar(Control['Date'], Control['Weight'], yerr=Control['Daily_SEM_W'], xerr = None, color = 'black', ls = None)
+ax1.errorbar(PFC['Date'], PFC['Weight'], yerr=PFC['Daily_SEM_W'], xerr = None, color = 'dodgerblue', ls = None)
+ax1.set_title("Average Body Weight")
+ax1.set_ylabel("% Body Weight")
+ax1.set_xlabel("Time (Days)")
+
+ax2.plot(IC['Date'], IC['MealSize'], marker='o', linestyle = '-', color=('royalblue'), label = 'IC, n=10')
+ax2.plot(VRF['Date'], VRF['MealSize'], marker='o', linestyle = '-', color=('red'), label = 'VRF, n=10')
+ax2.plot(Control['Date'], Control['MealSize'], marker='o', linestyle = '-', color=('black'), label = 'Control, n=9')
+ax2.plot(PFC['Date'], PFC['MealSize'], marker='o', linestyle = '-', color=('dodgerblue'), label = 'PFC, n=9')
+ax2.errorbar(IC['Date'], IC['MealSize'], yerr=IC['Daily_SEM_M'], xerr = None, color = 'royalblue', ls = None)
+ax2.errorbar(VRF['Date'], VRF['MealSize'], yerr=VRF['Daily_SEM_M'], xerr = None, color = 'red', ls = None)
+ax2.errorbar(Control['Date'], Control['MealSize'], yerr=Control['Daily_SEM_M'], xerr = None, color = 'black', ls = None)
+ax2.errorbar(PFC['Date'], PFC['MealSize'], yerr=PFC['Daily_SEM_M'], xerr = None, color = 'dodgerblue', ls = None)
+ax2.set_title("Average Meal Size")
+ax2.set_ylabel("Meal Size (Pellets)")
+ax2.set_xlabel("Time (Days)")
+ax2.axvline(2, color='black', linestyle='dashed', label = "Induction") #These axv line commands plot axv lines at days where induction occurs
+ax2.axvline(5, color='black', linestyle='dashed')
+ax2.axvline(8, color='black', linestyle='dashed')
+ax2.axvline(11, color='black', linestyle='dashed')
 plt.legend()
-plt.xlabel("Time (Days)")
 plt.grid(True)  
 plt.show()
 
 #Concatenating the data into one variable for statistical test
-data_final = pd.concat([Rolling_Medians("cohort2", "fem6_e_IChm4di_rex3"), Rolling_Medians("cohort3", "fem11_e_IChm4di_rex4"),
-                    Rolling_Medians("cohort2", "fem5_c_rex2"), Rolling_Medians("cohort3", "fem9_c_rex2"),
-                    Rolling_Medians("cohort3", "fem8_c_VRF_rex1"), Rolling_Medians("cohort2", "fem7_c_VRF_rex4"),
-                    Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1"), Rolling_Medians("cohort3", "fem10_e_PFChm4di_rex3")])
+data_final = pd.concat([GetData("cohort2", "fem6_e_IChm4di_rex3"), GetData("cohort3", "fem11_e_IChm4di_rex4"),
+                    GetData("cohort2", "fem5_c_rex2"), GetData("cohort3", "fem9_c_rex2"),
+                    GetData("cohort3", "fem8_c_VRF_rex1"), GetData("cohort2", "fem7_c_VRF_rex4"),
+                    GetData("cohort2", "fem4_e_PFChm4di_rex1"), GetData("cohort3", "fem10_e_PFChm4di_rex3")])
 
-#Linear mixed effects model (Considering our study design)
+#Linear mixed effects model for body weight (Considering our study design)
 model = smf.mixedlm("Weight ~ Treatment", data_final, groups=data_final["Animal"], re_formula = '0 + Cage') #Models weight with predictor variables as treatment and date. We need to model animal as a random effect to account for potential pseudoreplication
 #(For above) We need to model animal AND cage as random effects to account for 
 #pseudoreplication. We might consider also modelling cohort too to account for cohort specific effects
@@ -214,4 +274,30 @@ plt.title("Residuals Plot")
 plt.show()
 
 #Both of these look good to me.
+print(summary) #Printing model
+
+#Linear mixed effects model for meal size (Considering our study design)
+model = smf.mixedlm("MealSize ~ Treatment", data_final, groups=data_final["Animal"], re_formula = '0 + Cage') #Models weight with predictor variables as treatment and date. We need to model animal as a random effect to account for potential pseudoreplication
+#(For above) We need to model animal AND cage as random effects to account for 
+#pseudoreplication. We might consider also modelling cohort too to account for cohort specific effects
+model = model.fit()
+residuals = model.resid
+fitted = model.fittedvalues
+summary = model.summary()
+
+#Testing assumptions:
+#Q-Q plot for normality of residuals
+sp.probplot(residuals, dist="norm", plot=plt)
+plt.title("Q-Q Plot")
+plt.show()
+ 
+#Residuals vs fitted values to check equal variance of residuals
+plt.scatter(fitted, residuals)
+plt.axhline(y=0, color='r', linestyle='--')
+plt.xlabel("Fitted Values")
+plt.ylabel("Residuals")
+plt.title("Residuals Plot")
+plt.show()
+
+#The equal variance plot here looks a bit concerning to me in that it is shaped like a funnel.
 print(summary) #Printing model
