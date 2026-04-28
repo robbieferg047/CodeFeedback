@@ -7,6 +7,13 @@ import scipy.stats as sp
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
+fig, ax = plt.subplots()
+X = ["cohort2, cohort3"]
+Y = ["fem7_c_VRF_rex4", "fem4_e_PFChm4di_rex1", "fem6_e_IChm4di_rex3", "fem5_c_rex2", 
+     "fem8_c_VRF_rex1", "fem9_c_rex2", "fem10_e_PFChm4di_rex3", "fem11_e_IChm4di_rex4"]
+
+#Here, we can list off our cohorts and rigs, the script will run the command for all
+
 def Rolling_Medians(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_rex1", 1)) is cohort 2, PFC
     win = 30
     savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\" + X + "\\" + Y + "\\" #standard stuff
@@ -113,8 +120,7 @@ def Rolling_Medians(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolli
         df['Date'] = days['Days'] #Formatting days column
         df['Treatment'] = T #Formatting treatment column
         df['Cohort'] = X #Nice to retain this information
-        df['Cage'] = int((Y[-1:]))
-        df['Cage'] = pd.Series.to_frame(df['Cage']) #This is important as we need to model cage as a random effect in stats test (later) to account for potential pseudoreplication
+        df['Cage'] = int((Y[-1:])) #This is important as we need to model cage as a random effect in stats test (later) to account for potential pseudoreplication
         #ax.plot(df['Date'], df['Weight'], marker='o', linestyle = '-', color=col, alpha = 0.15) #(Un)comment to plot individual animals (Makes graph confusing)
         allanimals.append(df) #Appending lists of animal data into a new object
     allanimals = pd.concat(allanimals) #Concatenate into on df
@@ -143,10 +149,7 @@ def add_dailyavg(data): #Input PFCcohort2 and PFCcohort3 for example to return d
     daily_avg['Date'] = datelist
     daily_avg['Daily_SEM'] = errorlist
 
-    print(daily_avg)
-
     return daily_avg
-
 
 #Now run the class for all of our treatments *ACROSS COHORTS!*
 IC = add_dailyavg(pd.concat([Rolling_Medians("cohort2", "fem6_e_IChm4di_rex3"), 
@@ -160,9 +163,6 @@ Control = add_dailyavg(pd.concat([Rolling_Medians("cohort2", "fem5_c_rex2"),
 
 PFC = add_dailyavg(pd.concat([Rolling_Medians("cohort2", "fem4_e_PFChm4di_rex1"), 
                             Rolling_Medians("cohort3", "fem10_e_PFChm4di_rex3")]))
-
-print(PFC)
-
 
 #Plotting the figure
 ax.plot(IC['Date'], IC['Weight'], marker='o', linestyle = '-', color=('royalblue'), label = 'IC, n=10')
@@ -215,22 +215,3 @@ plt.show()
 
 #Both of these look good to me.
 print(summary) #Printing model
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
