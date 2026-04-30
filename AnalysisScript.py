@@ -89,9 +89,11 @@ def GetData(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolling_Media
     list_m = []
     list_t = []
     for rfid in known_tags: #for loop across animals
-        an=an+1
+        an = an + 1
         p=df1[df1['Animal']==rfid]['Pellets'].values
         t=df1[df1['Animal']==rfid]['Start_Time'].values
+        u=df1[df1['Animal']==rfid]['Unit'].values
+
         intervals=np.diff(t)/1000000000
         y, x = np.histogram(intervals, bins=np.arange(0,120,2))
         
@@ -105,7 +107,7 @@ def GetData(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolling_Media
                     p[row-1]=p[row-1]+p[row]
                     p=np.delete(p, row)
                     t=np.delete(t, row)
-                    u=np.elete(u, row)
+                    u=np.delete(u, row)
         list_m.append(p)
         list_t.append(t)
                    
@@ -116,20 +118,48 @@ def GetData(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolling_Media
         data={
             "Date":list_x[an],
             "Weight":list_weights[an],
-            "Animal":int(known_tags[an]),
+            "Animal":int(known_tags[an])
             }
         data_m = {
             "MealSize":list_m[an],
             "MealDates":list_t[an]
             }   
+        
         filtered_df=pd.DataFrame(data)
         filtered_df_m=pd.DataFrame(data_m)
+
+        dailyp_list = []
+        dailyp_date = []
+        dailyp_animal = []
+
+        for days in pd.date_range(start=timeline(1) - np.timedelta64(12, 'h'), 
+                                  end=timeline(1) + np.timedelta64(348, 'h'), freq = '12h'):
+                filtered_df_m['MealDates'] = filtered_df_m['MealDates'].dt.round('12h')
+                pellets = filtered_df_m.loc[filtered_df_m['MealDates'] == days]
+                pellets = np.sum(pellets['MealSize'])
+                pellets_an = known_tags[an]
+                dailyp_list.append(pellets)
+                dailyp_date.append(days)
+                dailyp_animal.append(pellets_an)
+        
+        data_p = {
+                "TotalPellets":dailyp_list,
+                "PelletDates":dailyp_date
+                }   
+        
+        filtered_df_p=pd.DataFrame(data_p)
+        print(filtered_df_p)
+        
         df = filtered_df.groupby(pd.Grouper(key='Date', freq = f'{bin_size}' + "h", origin=str(time_line[1])[2:12])).median().reset_index()
         df_m = filtered_df_m.groupby(pd.Grouper(key='MealDates', freq = f'{bin_size}' + "h", origin=str(time_line[1])[2:12])).median().reset_index()
+
         baselineweight = (df.loc[df['Date'] < (timeline(1) + np.timedelta64(2, "D"))])['Weight'].mean() #Pulls baseline weight (I.e., all weight values made during baseline period)
-        print(df_m)
+        baselinemealsize = (df_m.loc[df_m['MealDates'] < (timeline(1) + np.timedelta64(2, "D"))])['MealSize'].mean()
+    
+        df.dropna(axis='index', how = 'any', inplace = True) #Resetting axis    
         df['Weight'] = (df['Weight']/baselineweight)*100 #Normalising each value
-        df['MealSize'] = df_m['MealSize']
+        df['MealSize'] = (df_m['MealSize']/baselinemealsize)*100
+        df['Total_Pellets'] = filtered_df_p['TotalPellets']
 
         #Getting a column with treatment in it, and unique colours for each treatment (probably a more Pythonic way to do this):
         if "PFC" in Y: 
@@ -159,7 +189,6 @@ def GetData(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolling_Media
         allanimals.append(df) #Appending lists of animal data into a new object
     allanimals = pd.concat(allanimals) #Concatenate into on df
     allanimals = pd.DataFrame(allanimals)
-    print(allanimals)
     
     return allanimals #df can be returned for further analysis
 
@@ -169,6 +198,7 @@ def add_dailyavg(data): #Input PFCcohort2 and PFCcohort3 for example to return d
     datelist = []
     errorlistw = []
     errorlistm = []
+    avgpelletslist = []
 
     Date = 0
 
@@ -176,14 +206,16 @@ def add_dailyavg(data): #Input PFCcohort2 and PFCcohort3 for example to return d
         avgday = data.loc[data['Date'] == Date] #I.e., day 0, day 0.5...
         avgweight = avgday['Weight'].mean() #Returns the average associated with that day
         avgmeal = avgday['MealSize'].mean()
-        errorw = sp.sem(avgday['Weight']) #Finding the standard error mean associated with the weight values that day for error bars
-        errorm = sp.sem(avgday['MealSize'])
+        avgpellets = avgday['Total_Pellets']
+        errorw = sp.tstd(avgday['Weight']) #Finding the standard error mean associated with the weight values that day for error bars
+        errorm = sp.tstd(avgday['MealSize'])
 
         datelist.append(Date) #Appending these values to lists
         avglist.append(avgweight)
         avgmeallist.append(avgmeal)
         errorlistm.append(errorm)
         errorlistw.append(errorw)
+        avgpelletslist.append(avgpellets)
         Date = Date + 0.5 #Run the loop again for the next 12 hour bin
     daily_avg = pd.DataFrame()
     daily_avg['Date'] = datelist #Once all days gone through, make a dataframe consisting of all of these lists
@@ -191,9 +223,9 @@ def add_dailyavg(data): #Input PFCcohort2 and PFCcohort3 for example to return d
     daily_avg['MealSize'] = avgmeallist
     daily_avg['Daily_SEM_W'] = errorlistw
     daily_avg['Daily_SEM_M'] = errorlistm
+    daily_avg['TotalPellets'] = avgpelletslist
 
     return daily_avg
-
 
 #Now run the class for all of our treatments *ACROSS COHORTS!*
 IC = add_dailyavg(pd.concat([GetData("cohort2", "fem6_e_IChm4di_rex3"), 
@@ -234,7 +266,7 @@ ax2.errorbar(VRF['Date'], VRF['MealSize'], yerr=VRF['Daily_SEM_M'], xerr = None,
 ax2.errorbar(Control['Date'], Control['MealSize'], yerr=Control['Daily_SEM_M'], xerr = None, color = 'black', ls = None)
 ax2.errorbar(PFC['Date'], PFC['MealSize'], yerr=PFC['Daily_SEM_M'], xerr = None, color = 'dodgerblue', ls = None)
 ax2.set_title("Average Meal Size")
-ax2.set_ylabel("Meal Size (Pellets)")
+ax2.set_ylabel("Meal Size (% Baseline)")
 ax2.set_xlabel("Time (Days)")
 ax2.axvline(2, color='black', linestyle='dashed', label = "Induction") #These axv line commands plot axv lines at days where induction occurs
 ax2.axvline(5, color='black', linestyle='dashed')
