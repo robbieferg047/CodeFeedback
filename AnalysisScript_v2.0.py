@@ -316,7 +316,7 @@ ax3.axvline(8, color='black', linestyle='dashed')
 ax3.axvline(11, color='black', linestyle='dashed')
 ax3.grid(True)  
 
-#Derivative of weight graph (rate of change) (Just to use up the final axis on the figure. Possibly interesting, possibly not)
+#Derivative of weight (rate of change) (Just to use up the final axis on the figure. Possibly interesting, possibly not)
 ICweightdx = np.gradient(IC['Body Weight %'], IC['Date'], )
 PFCweightdx = np.gradient(PFC['Body Weight %'], PFC['Date'])
 VRFweightdx = np.gradient(VRF['Body Weight %'], VRF['Date'])
@@ -369,14 +369,15 @@ def BarChart(day, parameter, axis): #Specify the day of analysis, the parameter 
     
     annotate = sn.Annotator(axis, pairs, plot = 'barplot', data=data_chart, x = "Treatment", y = parameter) #Using statannotations to annotate with t-test
     annotate.configure(test='Mann-Whitney', verbose=2) #Non-parametric to be sensitive to assumption violations across parameters
-    annotate.apply_and_annotate()
+    print("Day:", day, "Parameter:", parameter) #So you can see what you ran t-tests for in the terminal
+    annotate.apply_and_annotate() #It should spit out p-values too
 
     ax1.axvline(day, color='blue', linestyle='dashed')
     ax2.axvline(day, color='blue', linestyle='dashed')
     ax3.axvline(day, color='blue', linestyle='dashed')
     ax4.axvline(day, color='blue', linestyle='dashed', label = "t-test") #Highlights the day the t-tests are being run for on the graphs
     ax6.set_ylim([80, 150]) #Need to set sensible ylims for BW chart, it looks ridiculous otherwise
-    axis.set_title(f'(day, parameter}')
+    axis.set_title(f'{day, parameter}')
     ax4.legend()
 
 BarData = BarChart(5, 'Meal Size %', ax5)
