@@ -316,7 +316,7 @@ ax3.axvline(8, color='black', linestyle='dashed')
 ax3.axvline(11, color='black', linestyle='dashed')
 ax3.grid(True)  
 
-#Derivative of weight (rate of change) (Just to use up the final axis on the figure. Possibly interesting, possibly not)
+#Derivative of weight graph (rate of change) (Just to use up the final axis on the figure. Possibly interesting, possibly not)
 ICweightdx = np.gradient(IC['Body Weight %'], IC['Date'], )
 PFCweightdx = np.gradient(PFC['Body Weight %'], PFC['Date'])
 VRFweightdx = np.gradient(VRF['Body Weight %'], VRF['Date'])
