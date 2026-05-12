@@ -23,12 +23,6 @@ ax5 = fig2.add_subplot(221)
 ax6 = fig2.add_subplot(222)
 ax7 = fig2.add_subplot(223)
 
-#fig3 = plt.figure(figsize=(16, 8))
-#ax9 = fig2.add_subplot(221)
-#ax10 = fig2.add_subplot(222)
-#ax11 = fig2.add_subplot(223)
-#ax12 = fig2.add_subplot(224)
-
 X = ["cohort2, cohort3"]
 Y = ["fem7_c_VRF_rex4", "fem4_e_PFChm4di_rex1", "fem6_e_IChm4di_rex3", "fem5_c_rex2", 
      "fem8_c_VRF_rex1", "fem9_c_rex2", "fem10_e_PFChm4di_rex3", "fem11_e_IChm4di_rex4"] #Here, we can list off our cohorts and rigs for ease
@@ -165,18 +159,19 @@ def GetData(X, Y): #X defines the cohort, Y defines the rig (I.e., Rolling_Media
                 "PelletDates":dailyp_date
                 }   
         
-        filtered_df_p=pd.DataFrame(data_p)
+        df_p=pd.DataFrame(data_p)
         
         df = filtered_df.groupby(pd.Grouper(key='Date', freq = f'{bin_size}' + "h", origin=str(time_line[1])[2:12])).median().reset_index()
         df_m = filtered_df_m.groupby(pd.Grouper(key='MealDates', freq = f'{bin_size}' + "h", origin=str(time_line[1])[2:12])).median().reset_index()
 
         baselineweight = (df.loc[df['Date'] < (timeline(1) + np.timedelta64(2, "D"))])['Weight'].mean() #Pulls baseline weight (I.e., all weight values made during baseline period)
         baselinemealsize = (df_m.loc[df_m['MealDates'] < (timeline(1) + np.timedelta64(2, "D"))])['MealSize'].mean()
+        baselinepellets = (df_p.loc[df_p['PelletDates'] < (timeline(1) + np.timedelta64(2, "D"))])['TotalPellets'].mean()
     
         df.dropna(axis='index', how = 'any', inplace = True) #Resetting axis    
         df['Body Weight %'] = (df['Weight']/baselineweight)*100 #Normalising each value
         df['Meal Size %'] = (df_m['MealSize']/baselinemealsize)*100
-        df['Total Pellets'] = filtered_df_p['TotalPellets']
+        df['Total Pellets %'] = (df_p['TotalPellets']/baselinepellets)*100
 
         #Getting a column with treatment in it, and unique colours for each treatment (probably a more Pythonic way to do this):
         if "PFC" in Y: 
@@ -229,10 +224,10 @@ def add_dailyavg(data): #Input PFCcohort2 and PFCcohort3 for example to return d
         avgday = data.loc[data['Date'] == Date] #I.e., day 0, day 0.5...
         avgweight = avgday['Body Weight %'].mean() #Returns the average associated with that day
         avgmeal = avgday['Meal Size %'].mean()
-        avgpellets = avgday['Total Pellets'].mean()
+        avgpellets = avgday['Total Pellets %'].mean()
         errorw = sp.tstd(avgday['Body Weight %']) #Finding the standard error mean associated with the weight values that day for error bars
         errorm = sp.tstd(avgday['Meal Size %'])
-        errorp = sp.tstd(avgday['Total Pellets'])
+        errorp = sp.tstd(avgday['Total Pellets %'])
 
         datelist.append(Date) #Appending these values to lists
         avglist.append(avgweight)
@@ -249,7 +244,7 @@ def add_dailyavg(data): #Input PFCcohort2 and PFCcohort3 for example to return d
     daily_avg['Daily_SEM_W'] = errorlistw
     daily_avg['Daily_SEM_M'] = errorlistm
     daily_avg['Daily_SEM_P'] = errorlistp
-    daily_avg['Total Pellets'] = avgpelletslist
+    daily_avg['Total Pellets %'] = avgpelletslist
 
     return daily_avg
 
@@ -299,16 +294,16 @@ ax2.axvline(8, color='black', linestyle='dashed')
 ax2.axvline(11, color='black', linestyle='dashed')
 ax2.grid(True)  
 
-ax3.plot(IC['Date'], IC['Total Pellets'], marker='o', linestyle = '-', color=('royalblue'), label = 'IC, n=10')
-ax3.plot(VRF['Date'], VRF['Total Pellets'], marker='o', linestyle = '-', color=('red'), label = 'VRF, n=10')
-ax3.plot(Control['Date'], Control['Total Pellets'], marker='o', linestyle = '-', color=('black'), label = 'Control, n=9')
-ax3.plot(PFC['Date'], PFC['Total Pellets'], marker='o', linestyle = '-', color=('dodgerblue'), label = 'PFC, n=9')
-ax3.errorbar(IC['Date'], IC['Total Pellets'], yerr=IC['Daily_SEM_P'], xerr = None, color = 'royalblue', ls = None)
-ax3.errorbar(VRF['Date'], VRF['Total Pellets'], yerr=VRF['Daily_SEM_P'], xerr = None, color = 'red', ls = None)
-ax3.errorbar(Control['Date'], Control['Total Pellets'], yerr=Control['Daily_SEM_P'], xerr = None, color = 'black', ls = None)
-ax3.errorbar(PFC['Date'], PFC['Total Pellets'], yerr=PFC['Daily_SEM_P'], xerr = None, color = 'dodgerblue', ls = None)
+ax3.plot(IC['Date'], IC['Total Pellets %'], marker='o', linestyle = '-', color=('royalblue'), label = 'IC, n=10')
+ax3.plot(VRF['Date'], VRF['Total Pellets %'], marker='o', linestyle = '-', color=('red'), label = 'VRF, n=10')
+ax3.plot(Control['Date'], Control['Total Pellets %'], marker='o', linestyle = '-', color=('black'), label = 'Control, n=9')
+ax3.plot(PFC['Date'], PFC['Total Pellets %'], marker='o', linestyle = '-', color=('dodgerblue'), label = 'PFC, n=9')
+ax3.errorbar(IC['Date'], IC['Total Pellets %'], yerr=IC['Daily_SEM_P'], xerr = None, color = 'royalblue', ls = None)
+ax3.errorbar(VRF['Date'], VRF['Total Pellets %'], yerr=VRF['Daily_SEM_P'], xerr = None, color = 'red', ls = None)
+ax3.errorbar(Control['Date'], Control['Total Pellets %'], yerr=Control['Daily_SEM_P'], xerr = None, color = 'black', ls = None)
+ax3.errorbar(PFC['Date'], PFC['Total Pellets %'], yerr=PFC['Daily_SEM_P'], xerr = None, color = 'dodgerblue', ls = None)
 ax3.set_title("Daily Pellets Eaten")
-ax3.set_ylabel("Pellets Eaten")
+ax3.set_ylabel("Pellets Eaten (% of Baseline)")
 ax3.set_xlabel("Time (Days)")
 ax3.axvline(2, color='black', linestyle='dashed', label = "Induction") #These axv line commands plot axv lines at days where induction occurs
 ax3.axvline(5, color='black', linestyle='dashed')
@@ -343,7 +338,7 @@ data_final = pd.concat([GetData("cohort2", "fem6_e_IChm4di_rex3"), GetData("coho
 
 def BarChart(day, parameter, axis): #Specify the day of analysis, the parameter you want (% BW, etc), and the axis to plot on (Each parameter gets its own axis)
     data_chartlist = [] #List for t-test later
-    for treatment in data_final['Treatment'].unique(): #Iterate over unique treatment values
+    for treatment in data_final['Treatment'].unique(): #Iterate over unique treatments
         data = data_final.loc[data_final['Treatment'] == treatment] 
         data = data.loc[data['Date'] == day]
         #data = data.loc[data['Date'] <= day + 0.5] #Can include the other 12 hour bin if desired by uncommenting
@@ -357,24 +352,31 @@ def BarChart(day, parameter, axis): #Specify the day of analysis, the parameter 
             col = 'red'
         if 'Control' in treatment: #Black is unintelligible on these graphs
             col = 'gray'
+
+        order = ['Control', 'VRF', 'PFC hM4Di', 'IC hM4Di']
    
-        sb.barplot(data_chart, x = data_chart['Treatment'], order = ['Control', 'VRF', 'PFC hM4Di', 'IC hM4Di'], y = parameter, color = col, errorbar = 'sd', ax = axis) #Using seaborn to plot barplot
-        sb.stripplot(x = data_chart['Treatment'], order = ['Control', 'VRF', 'PFC hM4Di', 'IC hM4Di'], y = parameter, data = pd.DataFrame(data_chart[parameter]), color = col, alpha = 1, edgecolor = 'black', linewidth = 1, ax = axis) #Stripplot for individual axes
+        sb.barplot(data_chart, x = data_chart['Treatment'], order = order, 
+                   y = parameter, color = col, errorbar = 'sd', ax = axis) #Using seaborn to plot barplot
+        
+        sb.stripplot(x = data_chart['Treatment'], order = order, 
+                     y = parameter, data = pd.DataFrame(data_chart[parameter]), color = col, alpha = 1, 
+                     edgecolor = 'black', linewidth = 1, ax = axis) #Stripplot for individual axes
+        
         data_chartlist.append(data_chart) #Appending a list for t-test
 
     data_chart = pd.concat(data_chartlist)
     data_chart = pd.DataFrame(data_chart)
-    pairs = [('PFC hM4Di', 'IC hM4Di'), ('VRF', 'Control'), ('VRF', 'PFC hM4Di'), ('IC hM4Di', 'VRF'), 
-             ('PFC hM4Di', 'Control'), ('IC hM4Di', 'Control')] #All the t-test pairs
-    
-    annotate = sn.Annotator(axis, pairs, plot = 'barplot', data=data_chart, x = "Treatment", y = parameter) #Using statannotations to annotate with t-test
-    annotate.configure(test='Mann-Whitney', verbose=2) #Non-parametric to be sensitive to assumption violations across parameters
+    pairs = list(itertools.combinations(np.unique(data_chart['Treatment']), 2)) #All the t-test pairs
+   
+    annotate = sn.Annotator(axis, pairs, plot = 'barplot', data=data_chart, x = "Treatment", y = parameter, loc = 'inside', order = order) #Using statannotations to annotate with t-test
+    annotate.configure(test='Mann-Whitney', verbose = 3, text_format = 'full', 
+                       alpha = 0.01) #Non-parametric to be sensitive to assumption violations across parameters, plus p-value threshold
     print("Day:", day, "Parameter:", parameter) #So you can see what you ran t-tests for in the terminal
     annotate.apply_and_annotate() #It should spit out p-values too
 
-    ax1.axvline(day, color='blue', linestyle='dashed')
-    ax2.axvline(day, color='blue', linestyle='dashed')
-    ax3.axvline(day, color='blue', linestyle='dashed')
+    ax1.axvline(day, color='blue', linestyle='dashed', label = None)
+    ax2.axvline(day, color='blue', linestyle='dashed', label = None)
+    ax3.axvline(day, color='blue', linestyle='dashed', label = None)
     ax4.axvline(day, color='blue', linestyle='dashed', label = "t-test") #Highlights the day the t-tests are being run for on the graphs
     ax6.set_ylim([80, 150]) #Need to set sensible ylims for BW chart, it looks ridiculous otherwise
     axis.set_title(f'{day, parameter}')
@@ -382,58 +384,6 @@ def BarChart(day, parameter, axis): #Specify the day of analysis, the parameter 
 
 BarData = BarChart(5, 'Meal Size %', ax5)
 BarData = BarChart(5, 'Body Weight %', ax6)
-BarData = BarChart(5, 'Total Pellets', ax7)
+BarData = BarChart(5, 'Total Pellets %', ax7)
 
 plt.show()
-
-#Linear mixed effects model for body weight (Considering our study design)
-model = smf.mixedlm("Weight ~ Treatment", data_final, groups=data_final["Animal"], re_formula = '0 + Cage') #Models weight with predictor variables as treatment and date. We need to model animal as a random effect to account for potential pseudoreplication
-#(For above) We need to model animal AND cage as random effects to account for 
-#pseudoreplication. We might consider also modelling cohort too to account for cohort specific effects
-model = model.fit()
-residuals = model.resid
-fitted = model.fittedvalues
-summary = model.summary()
-
-#Testing assumptions:
-#Q-Q plot for normality of residuals
-sp.probplot(residuals, dist="norm", plot=plt)
-plt.title("Q-Q Plot")
-plt.show()
- 
-#Residuals vs fitted values to check equal variance of residuals
-plt.scatter(fitted, residuals)
-plt.axhline(y=0, color='r', linestyle='--')
-plt.xlabel("Fitted Values")
-plt.ylabel("Residuals")
-plt.title("Residuals Plot")
-plt.show()
-
-#Both of these look good to me.
-print(summary) #Printing model
-
-#Linear mixed effects model for meal size (Considering our study design)
-model = smf.mixedlm("MealSize ~ Treatment", data_final, groups=data_final["Animal"], re_formula = '0 + Cage') #Models weight with predictor variables as treatment and date. We need to model animal as a random effect to account for potential pseudoreplication
-#(For above) We need to model animal AND cage as random effects to account for 
-#pseudoreplication. We might consider also modelling cohort too to account for cohort specific effects
-model = model.fit()
-residuals = model.resid
-fitted = model.fittedvalues
-summary = model.summary()
-
-#Testing assumptions:
-#Q-Q plot for normality of residuals
-sp.probplot(residuals, dist="norm", plot=plt)
-plt.title("Q-Q Plot")
-plt.show()
- 
-#Residuals vs fitted values to check equal variance of residuals
-plt.scatter(fitted, residuals)
-plt.axhline(y=0, color='r', linestyle='--')
-plt.xlabel("Fitted Values")
-plt.ylabel("Residuals")
-plt.title("Residuals Plot")
-plt.show()
-
-#The equal variance plot here looks a bit concerning to me in that it is shaped like a funnel.
-print(summary) #Printing model
