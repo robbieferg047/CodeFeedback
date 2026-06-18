@@ -1,0 +1,367 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from datetime import datetime, date, timedelta, time
+import matplotlib.dates as mdates
+import scipy.stats as sp
+import statsmodels.api as sm
+import statsmodels.regression.mixed_linear_model as lmem
+import statsmodels.formula.api as smf
+import statsmodels.stats.anova as statsanova
+import statistics as stats
+import re
+import itertools
+import seaborn as sb
+import statannotations.Annotator as sn
+
+
+fig1 = plt.figure(figsize=(16, 8)) #Defining figs
+ax1 = fig1.add_subplot(221)
+ax2 = fig1.add_subplot(222)
+ax3 = fig1.add_subplot(223)
+ax4 = fig1.add_subplot(224)
+
+cohorts = ["cohort1"]
+rigs = ["fem1_e_PFChm4di_rex1", "fem2_e_rex3", "fem3_c_rex4", "mal1_e_rex2"] #Here, we can list off our cohorts and rigs for ease
+
+bin_size = 24 #For unilateral control of bins variable (Supports 12 and 24 hours)
+days_for_plots = bin_size/24
+
+def GetData(cohort, rig): #I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_rex1", 1 is cohort 2, PFC
+    print("Processing Data") #The script may take a bit of time to run, so added print commands throughout to show the status
+    win = 30
+    savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\" + cohort + "\\" + rig + "\\" #standard stuff
+    known_tags = np.array(pd.read_csv(savepath + "AnimalTags.csv", header=None)).ravel().tolist() 
+    time_line = np.array(pd.read_csv(savepath+"TimeLine.csv", header=None)).astype(np.datetime64).reshape(-1,1) 
+
+    print(known_tags)
+    print(rig)
+
+    print(time_line)
+
+    def timeline(X):  #for loop to format dates so arrays can be sliced (doesn't work otherwise)
+        for date in time_line[X]:
+            if date != 2025:
+                break
+        return(date)
+    
+    start_date = (time_line[1])
+    last_date = (time_line[1] + np.timedelta64(5, 'D'))
+
+    d=(last_date-start_date)/np.timedelta64(1,'D')
+    days_to_plot=round(float(d[0]))
+
+    #Concatenate data across days to a long pandas dataframe    
+    data_coll_weight = pd.read_csv(savepath + str(start_date)[2:12] + "_events.csv")
+    for j in range(days_to_plot):
+        day=start_date+np.timedelta64(j+1,'D') 
+        data = pd.read_csv(savepath + str(day)[2:12] + "_events.csv")
+        frames=[data_coll_weight,data]
+        data_coll_weight=pd.concat(frames)
+    df=data_coll_weight
+    df['Start_Time']=pd.to_datetime(df['Start_Time'])
+    df['Animal']=df['Animal'].astype(int)
+    sorted_df = df.sort_values(by=['Start_Time'], ascending=True)
+
+    sorted_df.reset_index(drop=True, inplace=True)
+    df=sorted_df.drop([0,1]) #workaround!
+
+    #create a rolling median filter, roll through each animal's data, and plot
+    list_x=[]
+    list_weights=[]
+    list_weightmeds=[]
+    an=-1 #plotting index
+    for rfid in known_tags: #for loop across animals
+        an=an+1
+        animal_weights=df[df['Animal']==rfid]['Weight'].values
+        animal_times=df[df['Animal']==rfid]['Start_Time'].values
+        init_prctile=np.percentile(animal_weights[0:win-1],80)
+        keep_i=[]
+        rolling_i=[]
+        for i in range(win-1): #for loop to exclude outliers in first window
+            weight=animal_weights[i]
+            if weight<1.1*init_prctile and weight>0.9*init_prctile:
+                keep_i.append(i)
+                rolling_i.append(i)
+        rolling_median=np.median(animal_weights[rolling_i])
+        rolling_medians=[]
+        for i in range(len(keep_i)):
+            rolling_medians.append(rolling_median) 
+        for j in range(len(animal_weights[win:])): #for loop rolling through data
+            weight=animal_weights[j+win]
+            if weight<1.2*rolling_median and weight>0.8*rolling_median:
+                keep_i.append(j+win)
+                rolling_i.pop(0)
+                rolling_i.append(j+win)
+                rolling_median = np.median(animal_weights[rolling_i])
+                rolling_medians.append(rolling_median) 
+        x = animal_times[keep_i]
+        y = animal_weights[keep_i]
+        list_x.append(x)
+        list_weights.append(y)
+
+    an=-1
+    df1=df[df['Pellets'] != 0]
+    list_m = []
+    list_t = []
+    for rfid in known_tags: #for loop across animals
+        an = an + 1
+        p=df1[df1['Animal']==rfid]['Pellets'].values
+        t=df1[df1['Animal']==rfid]['Start_Time'].values
+        u=df1[df1['Animal']==rfid]['Unit'].values
+
+        intervals=np.diff(t)/1000000000
+        y, x = np.histogram(intervals, bins=np.arange(0,120,2))
+        
+        meal_threshold=30 #define duration (s) of meal based on histograms 
+        rows=len(p)-1
+        for i in range(rows):
+            row=rows-i
+            interval=intervals[row-1]
+            if u[row]==u[row-1]: #same unit
+                if interval<meal_threshold:
+                    p[row-1]=p[row-1]+p[row]
+                    p=np.delete(p, row)
+                    t=np.delete(t, row)
+                    u=np.delete(u, row)
+        list_m.append(p)
+        list_t.append(t)
+                   
+    allanimals = []
+    an=-1
+
+    for rfid in known_tags: #for loop across animals
+        an=an+1
+        data={
+            "Date":list_x[an],
+            "Weight":list_weights[an],
+            "Animal":int(known_tags[an])
+            }
+        data_m = {
+            "MealSize":list_m[an],
+            "MealDates":list_t[an]
+            }   
+        
+        filtered_df=pd.DataFrame(data)
+        filtered_df_m=pd.DataFrame(data_m)
+
+        #Rhythmicity analyser:
+        mealtimes = filtered_df_m['MealDates'] #Extract mealdates
+        mealtimes = mealtimes.dt.round('1h') #Extract just the hour value
+
+        #Counting unique values
+        times = pd.Series.value_counts(mealtimes)
+        #Making df readable
+        times = times.reset_index().rename(columns={"Index": "MealDates", 0: "Counts"})
+        times.columns = ['MealDates', 'Counts'] 
+        times = (times.sort_values(by=['MealDates'], ascending=True)).reset_index() 
+        times = pd.DataFrame(times)
+
+        dailyp_list = []
+        dailyp_date = []
+        dailyp_animal = []
+
+        count_avglist = []
+        datelist = []
+        hourlist = []
+        hourdf = []
+
+        for days in pd.date_range(start=timeline(1) - np.timedelta64(12, 'h'), 
+                                  end=timeline(1) + np.timedelta64(70, 'h'), freq = '12h'):
+                filtered_df_m['MealDates'] = filtered_df_m['MealDates'].dt.round('12h')
+                pellets = filtered_df_m.loc[filtered_df_m['MealDates'] == days]
+                pellets = np.sum(pellets['MealSize'])
+                pellets_an = known_tags[an]
+                dailyp_list.append(pellets)
+                dailyp_date.append(days)
+                dailyp_animal.append(pellets_an)
+        
+        data_p = {
+                "TotalPellets":dailyp_list,
+                "PelletDates":dailyp_date
+                }   
+        
+        df_p=pd.DataFrame(data_p)
+
+        df = filtered_df.groupby(pd.Grouper(key='Date', freq = f'{bin_size}' + "h", origin=str(time_line[1])[2:12]  + ' 12:00:00')).median().reset_index()
+        df_m = filtered_df_m.groupby(pd.Grouper(key='MealDates', freq = f'{bin_size}' + "h", origin=str(time_line[1])[2:12])).median().reset_index()        
+
+        baselineweight = (df.loc[df['Date'] < (timeline(1) + np.timedelta64(2, "D"))])['Weight'].mean() #Pulls baseline weight (I.e., all weight values made during baseline period)
+        baselinemealsize = (df_m.loc[df_m['MealDates'] < (timeline(1) + np.timedelta64(2, "D"))])['MealSize'].mean()
+        baselinepellets = (df_p.loc[df_p['PelletDates'] < (timeline(1) + np.timedelta64(2, "D"))])['TotalPellets'].mean()
+    
+        df.dropna(axis='index', how = 'any', inplace = True) #Resetting axis    
+        df['BW'] = (df['Weight']/baselineweight)*100 #Normalising each value
+        df['Meal Size'] = (df_m['MealSize']/baselinemealsize)*100
+        df['Total Pellets'] = (df_p['TotalPellets']/baselinepellets)*100
+
+        #Getting a column with treatment in it, and unique colours for each treatment (probably a more Pythonic way to do this):
+  
+        days = np.arange(0, len(df), days_for_plots).tolist() #Goes up in 0.5 or 1 depending on number of entries
+        days = pd.DataFrame(days, columns=['Days']) #Making it a df
+
+        df.dropna(axis='index', how = 'any', inplace = True) #Resetting axis   
+
+        if 'mal' in rig:
+            df['Sex'] = "Male"
+            df['Colour'] = "Pink"
+        else:
+            df['Sex'] = "Female"
+            df['Colour'] = "Blue"
+
+        df['Date'] = days['Days'] #Formatting days column
+        df['Cohort'] = cohort #Nice to retain this information
+        df['Cage'] = int((rig[-1:])) #This is important as we need to model cage as a random effect in stats test (later) to account for potential pseudoreplication
+        
+        #ax1.plot(df['Date'], df['Weight'], marker='o', linestyle = '-', color=col, alpha = 0.15)
+        #ax2.plot(df['Date'], df['MealSize'], marker='o', linestyle = '-', color=col, alpha = 0.15)
+        #ax3.plot(df['Date'], df['TotalPellets'], marker='o', linestyle = '-', color=col, alpha = 0.15) #(Un)comment to plot individual animals (Makes graph confusing)    
+
+        allanimals.append(df) #Appending lists of animal data into a new object
+
+    allanimals = pd.concat(allanimals)
+    allanimals = pd.DataFrame(allanimals) 
+    
+    return allanimals #df can be returned for further analysis
+
+def add_dailyavg(data, sex): #Input PFCcohort2 and PFCcohort3 for example to return daily averages across cohorts
+    print("Running daily average")
+
+    avglist = []
+    avgmeallist = []
+    datelist = []
+    errorlistw = []
+    errorlistm = []
+    errorlistp = []
+    avgpelletslist = []
+    treatmentlist = []
+    sexlist = []
+    collist = []
+
+    Date = 0
+
+    for days in np.unique((data['Date']).dropna()): #For loop across days (I.e., the loop will run for all unique day values)
+        avgday = data.loc[data['Date'] == Date] #I.e., day 0, day 0.5...
+        avgweight = avgday['BW'].mean() #Returns the average associated with that day
+        avgmeal = avgday['Meal Size'].mean()
+        avgpellets = avgday['Total Pellets'].mean()
+        errorw = sp.tstd(avgday['BW']) #Finding the standard error mean associated with the weight values that day for error bars
+        errorm = sp.tstd(avgday['Meal Size'])
+        errorp = sp.tstd(avgday['Total Pellets'])
+        datelist.append(Date) #Appending these values to lists
+        avglist.append(avgweight)
+        avgmeallist.append(avgmeal)
+        errorlistm.append(errorm)
+        errorlistw.append(errorw)
+        errorlistp.append(errorp)
+        avgpelletslist.append(avgpellets)
+
+        if sex == "Male":
+            sexlist.append("Male")
+            collist.append("Pink")
+        else:
+            sexlist.append("Female")
+            collist.append("Blue")
+
+        Date = Date + days_for_plots #Run the loop again for the next bin
+
+    daily_avg = pd.DataFrame()
+    hourly_avg = pd.DataFrame()
+
+    daily_avg['Date'] = datelist #Once all days gone through, make a dataframe consisting of all of these lists
+    daily_avg['BW'] = avglist
+    daily_avg['Meal Size'] = avgmeallist
+    daily_avg['Daily_SEM_W'] = errorlistw
+    daily_avg['Daily_SEM_M'] = errorlistm
+    daily_avg['Daily_SEM_P'] = errorlistp
+    daily_avg['Total Pellets'] = avgpelletslist
+    daily_avg['Sex'] = sexlist
+    daily_avg['Colour'] = collist
+
+    return daily_avg
+
+males = add_dailyavg(GetData("cohort1_2", "mal1_e2_rex2"), "Male")
+females = add_dailyavg(GetData("cohort1_2", "fem2_e2_rex3"), "Female")
+
+#Plotting the figures
+ax1.plot(males['Date'], males['BW'], marker='o', linestyle = '-', color='deeppink', label = 'Males, n=5')
+ax1.plot(females['Date'], females['BW'], marker='o', linestyle = '-', color='deepskyblue', label = 'Females, n=5')
+ax1.axvline(2, color='black', linestyle='dashed', label = "Induction") #These axv line commands plot axv lines at days where induction occurs
+ax1.axvline(5, color='black', linestyle='dashed')
+ax1.errorbar(males['Date'], males['BW'], yerr=males['Daily_SEM_W'], xerr = None, color = 'deeppink', ls = None)
+ax1.errorbar(females['Date'], females['BW'], yerr=females['Daily_SEM_W'], xerr = None, color = 'deepskyblue', ls = None)
+ax1.set_title("Average Weight")
+ax1.set_ylabel("Body Weight (% of Baseline)")
+ax1.set_xlabel("Time (Days)")
+ax1.grid(True)  
+
+males = GetData("cohort1_2", "mal1_e2_rex2")
+females = GetData("cohort1_2", "fem2_e2_rex3")
+data_final = pd.concat([males, females])
+
+def BarChart(day, parameter, axis): #Specify the day of analysis, the parameter you want (% BW, etc), and the axis to plot on (Each parameter gets its own axis)
+    data_chartlist = [] #List for t-test later
+    for Sex in data_final['Sex'].dropna().unique(): #Iterate over males vs female
+        print(Sex)
+        data = data_final.loc[data_final['Sex'] == Sex] 
+        data = data.loc[data['Date'] == day]
+       
+        #data = data.loc[data['Date'] <= day + 0.5] #Can include the other 12 hour bin if desired by uncommenting
+        data_chart = pd.DataFrame(data[[parameter, 'Sex']])
+
+        if Sex == "Male":
+            col = "deeppink"
+        else:
+            col = "deepskyblue"
+
+        sb.barplot(data_chart, x = data_chart['Sex'], 
+                   y = parameter, color = col, errorbar = 'sd', ax = axis) #Using seaborn to plot barplot
+        
+        sb.stripplot(x = data_chart['Sex'], 
+                     y = parameter, data = pd.DataFrame(data_chart[parameter]), color = col, alpha = 1, 
+                     edgecolor = 'black', linewidth = 1, ax = axis) #Stripplot for individual data points
+        data_chartlist.append(data_chart) #Appending a list for t-test
+        data_chartlist_check = pd.concat(data_chartlist)
+        
+        if Sex == "Male":
+            sp.probplot(data_chartlist_check['BW'], dist="norm", plot=ax3)
+            print(data_chartlist_check)
+        if Sex == "Female":
+            data_chartlist_check = data_chartlist_check.loc[data_chartlist_check['Sex'] == "Female"]
+            sp.probplot(data_chartlist_check['BW'], dist="norm", plot=ax4) #Checking normality
+
+        ax3.set_title("Q-Q Plot" + f'{parameter}' +  'Males')
+        ax4.set_title("Q-Q Plot" + f'{parameter}' +  'Females')
+        
+        ax3.legend()
+        ax4.legend()
+
+    data_chart = pd.concat(data_chartlist)
+    data_chart = pd.DataFrame(data_chart)
+    pairs = list(itertools.combinations(np.unique(data_chart['Sex']), 2)) #All the t-test pairs
+   
+    annotate = sn.Annotator(axis, pairs, plot = 'barplot', data= data_chart, x = "Sex", 
+                            y = parameter, loc = 'inside', fontsize = 'small') #Using statannotations to annotate with t-test
+    
+    annotate.configure(test='t-test_welch', verbose = 3, text_format = 'star', 
+                            alpha = 0.05) #Welch's because of equal variance concerns
+    
+    data_chart_check = pd.DataFrame()
+    data_chart_check[parameter] = data_chart[parameter]
+    print(data_chart_check)
+
+    print("Day:", day, "Parameter:", parameter) #So you can see what you ran t-tests for in the terminal
+    annotate.apply_and_annotate() #It should spit out p-values too
+
+    ax2.set_ylim([80, 110]) #Need to set sensible ylims for BW chart, it looks ridiculous otherwise
+
+    axis.set_title("Day: " + f'{day}' + ", " + " Parameter: " f'{parameter}')
+    ax1.axvline(day, color='blue', linestyle='dashed')
+
+analysis_day = 5.0
+BarData = BarChart(analysis_day, 'BW', ax2)
+
+plt.show()
+#ax2.axvline(analysis_day, color='blue', linestyle='dashed')
+#ax3.axvline(analysis_day, color='blue', linestyle='dashed')
+#ax4.axvline(analysis_day, color='blue', linestyle='dashed', label = "t-test") #Highlights the day the t-tests are being run for on the graphs
