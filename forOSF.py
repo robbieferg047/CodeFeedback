@@ -8,6 +8,10 @@ def GetData(cohort, rig): #I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_re
     print("Processing Data") #The script may take a bit of time to run, so added print commands throughout to show the status
     win = 30
     savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\" + cohort + "\\" + rig + "\\" #standard stuff
+
+    if rig == 'None':
+        savepath="C:\\Users\\robbi\\Documents\\GitHub\mazerex2\\" + cohort + "\\" #For mal2_RI
+
     known_tags = np.array(pd.read_csv(savepath + "AnimalTags.csv", header=None)).ravel().tolist() 
     time_line = np.array(pd.read_csv(savepath + "TimeLine.csv", header=None)).astype(np.datetime64).reshape(-1,1) 
 
@@ -17,8 +21,8 @@ def GetData(cohort, rig): #I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_re
                 break
         return(date)
     
-    start_date = (time_line[1] - np.timedelta64(24, 'h')) #Grab data from 3 days before induction
-    last_date = (time_line[1] + np.timedelta64(14, 'D')) #up to end of experiment
+    start_date = (time_line[1] - np.timedelta64(24, 'h')) #Starting for 72h before induction 1
+    last_date = (time_line[1] + np.timedelta64(8, 'D')) #Going to end of induction 1
 
     d=(last_date-start_date)/np.timedelta64(1,'D')
     days_to_plot=round(float(d[0]))
@@ -34,23 +38,32 @@ def GetData(cohort, rig): #I.e., Rolling_Medians("cohort 2", "fem4_e_PFChm4di_re
     df['Start_Time']=pd.to_datetime(df['Start_Time'])
     df['Animal']=df['Animal'].astype(int)
     sorted_df = df.sort_values(by=['Start_Time'], ascending=True)
-    sorted_df = sorted_df.loc[sorted_df['Start_Time'] >= (timeline(1) - np.timedelta64(24, 'h'))] #Start from 72h before induction 1
+    sorted_df = sorted_df.loc[sorted_df['Start_Time'] >= (timeline(1) - np.timedelta64(24, 'h'))] #Cutting off to 72h before induction 1
 
-    sorted_df['Start_Time'] = ((sorted_df['Start_Time']) - (timeline(1) + np.timedelta64(2, 'D'))) #Go from seconds from induction 1
-    sorted_df['Start_Time'] = sorted_df['Start_Time']/np.timedelta64(1, 's') #Convert to seconds
+    sorted_df['Start_Time'] = ((sorted_df['Start_Time']) - (timeline(1) + np.timedelta64(2, 'D'))) #Making all timepoints relative to induction 1
+    sorted_df['Start_Time'] = sorted_df['Start_Time']/np.timedelta64(1, 's') #Converting to seconds
 
-    for animal in known_tags:
-        if animal == 0:
-            continue
-        else:
-            sorted_df_an = sorted_df.loc[sorted_df['Animal'] == animal]
-            sorted_df_an.to_csv("C:\\Users\\robbi\\Desktop\\Masters\\VRF Project\\OSF_repo\\" + cohort + "\\" + rig + "\\" + f'{str(animal)}.csv')
+    if rig == "None":
+        for animal in known_tags:
+            if animal == 0:
+                continue
+            else:
+                sorted_df_an = sorted_df.loc[sorted_df['Animal'] == animal]
+                sorted_df_an.to_csv("C:\\Users\\robbi\\Desktop\\Masters\\VRF Project\\OSF_repo\\" + cohort + "\\" + f'{str(animal)}.csv')
+
+    else:
+        for animal in known_tags:
+            if animal == 0:
+                continue
+            else:
+                sorted_df_an = sorted_df.loc[sorted_df['Animal'] == animal]
+                sorted_df_an.to_csv("C:\\Users\\robbi\\Desktop\\Masters\\VRF Project\\OSF_repo\\" + cohort + "\\" + rig + "\\" + f'{str(animal)}.csv')
 
     return sorted_df
 
-cohorts = ["cohort2", "cohort3"]
+cohorts = ["cohort2", "cohort3",  "mal2_RI"]
 rigs = ["fem7_c_VRF_rex4", "fem4_e_PFChm4di_rex1", "fem6_e_IChm4di_rex3", "fem5_c_rex2", 
-     "fem8_c_VRF_rex1", "fem9_c_rex2", "fem10_e_PFChm4di_rex3", "fem11_e_IChm4di_rex4"]
+     "fem8_c_VRF_rex1", "fem9_c_rex2", "fem10_e_PFChm4di_rex3", "fem11_e_IChm4di_rex4", "None"]
 
 for cohort in cohorts:
     for rig in rigs:
@@ -60,3 +73,4 @@ for cohort in cohorts:
         except Exception:
             print("Null combo! Passing...")
             pass
+
